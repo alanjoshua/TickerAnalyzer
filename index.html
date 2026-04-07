@@ -148,8 +148,9 @@
                     <tbody id="dcf-rows" 
                         hx-get="/api/dcf"
                         hx-indicator="#loading-spinner"
+                        hx-vals="js:{beta: event.detail.beta, currentPrice: event.detail.currentPrice}"
                         hx-disabled-elt="#analyze-btn"
-                        hx-include="#global-ticker-input" 
+                        hx-include="#global-ticker-input"
                         hx-trigger="run-dcf from:body"
                         hx-target="this">
                     </tbody>

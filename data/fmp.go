@@ -19,6 +19,7 @@ type FMPIncomeStatement []struct {
 	IncomeBeforeTax          float64 `json:"incomeBeforeTax"`
 	IncomeTaxExpense         float64 `json:"incomeTaxExpense"`
 	WeightedAverageShsOutDil float64 `json:"weightedAverageShsOutDil"`
+	InterestExpense          float64 `json:"interestExpense"`
 }
 
 type FMPBalanceSheet []struct {
@@ -36,15 +37,18 @@ type FMPTreasury []struct {
 }
 
 type TickerFundamentals struct {
-	BaseRevenue       float64
-	TotalCash         float64
-	TotalDebt         float64
-	SharesOutstanding float64
+	BaseRevenue             float64
+	TotalCash               float64
+	TotalDebt               float64
+	InterestExpense         float64
+	SharesOutstanding       float64
+	TotalShareHoldersEquity float64
 
 	HistRevCAGR        float64
 	AvgOperatingMargin float64
 	AvgTaxRate         float64
 	SalesToCapital     float64
+	TaxRate            float64
 }
 
 func Get10YearRiskFreeRate() (float64, error) {
@@ -134,6 +138,8 @@ func GetCompanyFundamentals(ticker string) (TickerFundamentals, error) {
 		}
 	}
 
+	funds.InterestExpense = incData[0].InterestExpense / 1000000.0
+	funds.TotalShareHoldersEquity = balData[0].TotalStockholdersEquity / 1000000.0
 	funds.AvgOperatingMargin = totalMargin / float64(len(incData))
 	funds.AvgTaxRate = totalTaxRate / float64(len(incData))
 
@@ -169,6 +175,16 @@ func GetCompanyFundamentals(ticker string) (TickerFundamentals, error) {
 	}
 
 	funds.SalesToCapital = salesToCapital
+
+	// Calculate effective tax rate
+	taxRate := incData[0].IncomeTaxExpense / incData[0].IncomeBeforeTax
+	// Sanity clamp
+	if taxRate < 0 {
+		taxRate = 0
+	} else if taxRate > 0.30 { // Cap it at a reasonable global max, like 30%
+		taxRate = 0.30
+	}
+	funds.TaxRate = taxRate
 
 	return funds, nil
 }

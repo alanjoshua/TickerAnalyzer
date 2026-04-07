@@ -9,6 +9,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -122,7 +123,8 @@ func riskAnalysisHandler(w http.ResponseWriter, r *http.Request) {
 		ChartData:     template.JS(string(chartDataJSON)),
 	}
 
-	w.Header().Set("HX-Trigger", "run-dcf")
+	triggerPayload := fmt.Sprintf(`{"run-dcf": {"beta": %.4f, "currentPrice": %.2f}}`, beta, tickerStats.CurrentPrice)
+	w.Header().Set("HX-Trigger", triggerPayload)
 
 	tmpl, err := template.ParseFiles("templates/risk_analysis.html")
 	if err != nil {
@@ -142,6 +144,17 @@ func dcfHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	beta, err := strconv.ParseFloat(r.URL.Query().Get("beta"), 64)
+	if err != nil {
+		fmt.Fprintf(w, `<tr id="dcf-rows"><td colspan="6" class="text-red-400 p-4">Error converting beta value to float %v</td></tr>`, err)
+		return
+	}
+	currentPrice, err := strconv.ParseFloat(r.URL.Query().Get("currentPrice"), 64)
+	if err != nil {
+		fmt.Fprintf(w, `<tr id="dcf-rows"><td colspan="6" class="text-red-400 p-4">Error converting currentPrice value to float %v</td></tr>`, err)
+		return
+	}
+
 	// 1. Fetch Live Data
 	funds, err := data.GetCompanyFundamentals(ticker)
 	riskFreeRate, err := data.Get10YearRiskFreeRate()
@@ -158,11 +171,14 @@ func dcfHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Fundamentals for ", ticker, ": ", funds)
 	fmt.Println("Risk free rate: ", riskFreeRate)
 
+	marketCap := currentPrice * funds.SharesOutstanding
+	curWacc := quant.CalculateWacc(marketCap, funds.TotalDebt, riskFreeRate, beta, EQUITYRISKPREMIUM, funds.InterestExpense, funds.TaxRate)
+
 	// 2. Generate the 10-Year Glide Paths
 	// Assume a Terminal Growth of 3% (0.03) and a Terminal WACC of 8% (0.08)
 	// Assume current WACC is roughly 10% (0.10) for the interpolation start
 	revGrowthRates := quant.Interpolate(funds.HistRevCAGR, riskFreeRate, 11)
-	WACCs := quant.Interpolate(0.10, terminalWacc, len(revGrowthRates)) // TODO: Calculate current wacc
+	WACCs := quant.Interpolate(curWacc, terminalWacc, len(revGrowthRates)) // TODO: Calculate current wacc
 	opMargins := quant.Interpolate(funds.AvgOperatingMargin, funds.AvgOperatingMargin, len(revGrowthRates))
 	taxRates := quant.Interpolate(funds.AvgTaxRate, funds.AvgTaxRate, len(revGrowthRates))
 	salesToCapitalRatio := quant.Interpolate(funds.SalesToCapital, funds.SalesToCapital, len(revGrowthRates))
