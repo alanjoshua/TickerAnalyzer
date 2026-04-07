@@ -155,7 +155,7 @@ func dcfHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 1. Fetch Live Data
+	// Fetch Live Data
 	funds, err := data.GetCompanyFundamentals(ticker)
 	riskFreeRate, err := data.Get10YearRiskFreeRate()
 	if err != nil {
@@ -174,9 +174,7 @@ func dcfHandler(w http.ResponseWriter, r *http.Request) {
 	marketCap := currentPrice * funds.SharesOutstanding
 	curWacc := quant.CalculateWacc(marketCap, funds.TotalDebt, riskFreeRate, beta, EQUITYRISKPREMIUM, funds.InterestExpense, funds.TaxRate)
 
-	// 2. Generate the 10-Year Glide Paths
-	// Assume a Terminal Growth of 3% (0.03) and a Terminal WACC of 8% (0.08)
-	// Assume current WACC is roughly 10% (0.10) for the interpolation start
+	// Generate the 10-Year data
 	revGrowthRates := quant.Interpolate(funds.HistRevCAGR, riskFreeRate, 11)
 	WACCs := quant.Interpolate(curWacc, terminalWacc, len(revGrowthRates)) // TODO: Calculate current wacc
 	opMargins := quant.Interpolate(funds.AvgOperatingMargin, funds.AvgOperatingMargin, len(revGrowthRates))
