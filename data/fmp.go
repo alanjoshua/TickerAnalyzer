@@ -36,6 +36,11 @@ type FMPTreasury []struct {
 	Year10 float64 `json:"year10"`
 }
 
+type CompanyProfile []struct {
+	Beta    float64 `json:"beta"`
+	IpoDate string  `json:"ipoDate"`
+}
+
 type TickerFundamentals struct {
 	BaseRevenue             float64
 	TotalCash               float64
@@ -84,6 +89,33 @@ func Get10YearRiskFreeRate() (float64, error) {
 
 }
 
+func GetDataYearsLimit(ticker string, client *http.Client, apiKey string) int {
+	var companyProfile CompanyProfile
+
+	url := fmt.Sprintf("%sprofile?symbol=%s&apikey=%s", FMP_BaseURL, ticker, apiKey)
+	resp, err := client.Get(url)
+	if err != nil {
+		return -1
+	}
+	defer resp.Body.Close()
+
+	if err := json.NewDecoder(resp.Body).Decode(&companyProfile); err != nil {
+		return -1
+	}
+	if len(companyProfile) == 0 {
+		return -1
+	}
+
+	curDate := time.Now()
+	layout := "2006-01-02"
+	ipoDate, err := time.Parse(layout, companyProfile[0].IpoDate)
+	if err != nil {
+		return -1
+	}
+
+	return curDate.Year() - ipoDate.Year()
+}
+
 func GetCompanyFundamentals(ticker string) (TickerFundamentals, error) {
 	var funds TickerFundamentals
 
@@ -94,7 +126,14 @@ func GetCompanyFundamentals(ticker string) (TickerFundamentals, error) {
 
 	client := &http.Client{Timeout: 10 * time.Second}
 
-	incUrl := fmt.Sprintf("%sincome-statement?symbol=%s&limit=5&apikey=%s", FMP_BaseURL, ticker, apikey)
+	yearLimit := GetDataYearsLimit(ticker, client, apikey)
+	if yearLimit <= 0 {
+		yearLimit = 1
+	} else if yearLimit > 5 {
+		yearLimit = 5
+	}
+
+	incUrl := fmt.Sprintf("%sincome-statement?symbol=%s&limit=%d&apikey=%s", FMP_BaseURL, ticker, yearLimit, apikey)
 	incResp, err := client.Get(incUrl)
 	if err != nil {
 		return funds, err
@@ -105,7 +144,7 @@ func GetCompanyFundamentals(ticker string) (TickerFundamentals, error) {
 	if err := json.NewDecoder(incResp.Body).Decode(&incData); err != nil {
 		return funds, err
 	}
-	if len(incData) < 2 {
+	if len(incData) < 1 {
 		return funds, fmt.Errorf("not enough historical data for %s to calculate CAGR", ticker)
 	}
 
@@ -124,11 +163,15 @@ func GetCompanyFundamentals(ticker string) (TickerFundamentals, error) {
 		return funds, fmt.Errorf("no balance sheet data found")
 	}
 
-	latestRev := incData[0].Revenue
-	oldestRev := incData[len(incData)-1].Revenue
-	years := float64(len(incData) - 1)
+	if (len(incData)) > 1 {
+		latestRev := incData[0].Revenue
+		oldestRev := incData[len(incData)-1].Revenue
+		years := float64(len(incData) - 1)
 
-	funds.HistRevCAGR = math.Pow(latestRev/oldestRev, 1.0/years) - 1.0
+		funds.HistRevCAGR = math.Pow(latestRev/oldestRev, 1.0/years) - 1.0
+	} else {
+		funds.HistRevCAGR = -1
+	}
 
 	var totalMargin, totalTaxRate float64
 	for _, year := range incData {
@@ -143,7 +186,7 @@ func GetCompanyFundamentals(ticker string) (TickerFundamentals, error) {
 	funds.AvgOperatingMargin = totalMargin / float64(len(incData))
 	funds.AvgTaxRate = totalTaxRate / float64(len(incData))
 
-	funds.BaseRevenue = latestRev / 1000000.0
+	funds.BaseRevenue = incData[0].Revenue / 1000000.0
 	funds.SharesOutstanding = incData[0].WeightedAverageShsOutDil / 1000000.0
 
 	totalLiquidCash := balData[0].CashAndCashEquivalents + balData[0].ShortTermInvestments

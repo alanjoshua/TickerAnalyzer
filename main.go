@@ -173,9 +173,14 @@ func dcfHandler(w http.ResponseWriter, r *http.Request) {
 
 	marketCap := currentPrice * funds.SharesOutstanding
 	curWacc := quant.CalculateWacc(marketCap, funds.TotalDebt, riskFreeRate, beta, EQUITYRISKPREMIUM, funds.InterestExpense, funds.TaxRate)
+	curRevGrowth := funds.HistRevCAGR
+	// Couldn't calculate rev growth due to insufficient historic data
+	if curRevGrowth == -1 {
+		curRevGrowth = riskFreeRate
+	}
 
 	// Generate the 10-Year data
-	revGrowthRates := quant.Interpolate(funds.HistRevCAGR, riskFreeRate, 11)
+	revGrowthRates := quant.Interpolate(curRevGrowth, riskFreeRate, 11)
 	WACCs := quant.Interpolate(curWacc, terminalWacc, len(revGrowthRates)) // TODO: Calculate current wacc
 	opMargins := quant.Interpolate(funds.AvgOperatingMargin, funds.AvgOperatingMargin, len(revGrowthRates))
 	taxRates := quant.Interpolate(funds.AvgTaxRate, funds.AvgTaxRate, len(revGrowthRates))
