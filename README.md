@@ -4,11 +4,10 @@ A simple website written in Go that performs Risk Analysis and DCF for a given t
 
 This is mainly a side project for me to learn the Go programming language, and also experiment with some of the financial concepts that I have been learning as part of my CFA prep, and create a tool that I could ultimately use to analyze stocks of interest.
 
-
-**This is still very much a work in progress!**
-
-
 <br>
+
+**Note: This is still very much a work in progress!**
+
 <br>
 <br>
 <img width="970" height="590" alt="RiskAnalysis" src="https://github.com/user-attachments/assets/011026dc-babe-4cd6-b42f-e419fb78f3cd" />
