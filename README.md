@@ -18,7 +18,7 @@ This is mainly a side project for me to learn the Go programming language, and a
 → **Alpaca-Market** is used for historic price data
 
 
-→ **FMP** is the primary data source for a ticker’s Income statement and balance sheet data. Currently the free tier is being used, so data is only limited to top companies such as Apple, Nvidia. etc
+→ **FMP** is the primary data source for a ticker’s Income statement and balance sheet data. Currently the free tier is being used, so data is limited to top companies such as Apple, Nvidia. etc
 
 
 → **Yahoo Finance** is the backup source if FMP does not provide the ticker information. Since Yahoo blocks web               scrapers, I used yFinance, a popular python library that is used to access yahoo’s data. To do this, a python                 FastAPI microservice is also being run
@@ -32,9 +32,9 @@ This is mainly a side project for me to learn the Go programming language, and a
 ## Discount CashFlow Analysis
 
 * DCF is a valuation methodology where you make educated projections regarding a company’s future revenue growths, operating margins, etc, and discount the future projected cashflows back to today’s value to get an estimate of the company’s Intrinsic value.
-* The calculation methodoly used in this tool is based on the Aswath Damodaran’s metholody as explained in his book “Narrative and Numbers”
+* The calculation methodoly used in this tool is based on Aswath Damodaran’s metholody as explained in his book “Narrative and Numbers”
 * We make use of the company’s historic Income Statements and Balance Sheet data to make educated guesses about the company’s DCF input values
-* The DCF table is interacitve, so feel free to change the input values and see how the company’s value changes
+* The DCF table is interacitve, so feel free to change the auto-populated input values and see how the company’s value changes
 
 ## Tech Stack
 
@@ -76,7 +76,7 @@ uvicorn main:app --port 8000
 ```python
 go mod tidy
 
-// Start the server
+# Start the server
 go run main.go
 ```
 
