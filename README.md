@@ -3,6 +3,15 @@
 A simple website written in Go that performs Risk Analysis and DCF for a given ticker.
 
 This is mainly a side project for me to learn the Go programming language, and also experiment with some of the financial concepts that I have been learning as part of my CFA prep, and create a tool that I could ultimately use to analyze stocks of interest.
+<br>
+<br>
+<br>
+<img width="970" height="590" alt="RiskAnalysis" src="https://github.com/user-attachments/assets/011026dc-babe-4cd6-b42f-e419fb78f3cd" />
+<br>
+<hr>
+<br>
+<img width="990" height="962" alt="DCF" src="https://github.com/user-attachments/assets/f653fc5b-031a-4760-ab85-efecbc60f69d" />
+<br>
 
 ## Financial Data Sources
 
@@ -44,7 +53,7 @@ FMP_API_KEY=your_financial_modeling_prep_key
 ALPACA_API_KEY=your_alpaca_markets_key
 ```
 
-### 2. Python Microservice setup
+### 2. Python Microservice setup for Yahoo Finance data
 
 ```python
 cd FinanceDataPy
