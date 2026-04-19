@@ -3,6 +3,11 @@
 A simple website written in Go that performs Risk Analysis and DCF for a given ticker.
 
 This is mainly a side project for me to learn the Go programming language, and also experiment with some of the financial concepts that I have been learning as part of my CFA prep, and create a tool that I could ultimately use to analyze stocks of interest.
+
+
+**This is still very much a work in progress!**
+
+
 <br>
 <br>
 <br>
@@ -17,9 +22,7 @@ This is mainly a side project for me to learn the Go programming language, and a
 
 → **Alpaca-Market** is used for historic price data
 
-
 → **FMP** is the primary data source for a ticker’s Income statement and balance sheet data. Currently the free tier is being used, so data is limited to top companies such as Apple, Nvidia. etc
-
 
 → **Yahoo Finance** is the backup source if FMP does not provide the ticker information. Since Yahoo blocks web               scrapers, I used yFinance, a popular python library that is used to access yahoo’s data. To do this, a python                 FastAPI microservice is also being run
 
