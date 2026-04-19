@@ -96,6 +96,10 @@
         
         <div class="bg-gray-800 border border-gray-700 rounded-lg p-6 shadow-xl">
             
+        <div class="flex justify-between items-center mb-4">
+            <span id="DCFDataSource" class="bg-blue-900 text-blue-300 text-xs font-medium px-2.5 py-0.5 rounded border border-blue-400">Data Source: Test Data</span>
+        </div>
+            
             <div class="grid grid-cols-4 gap-4 mb-8">
                 <div>
                     <label class="block text-xs text-gray-400 uppercase tracking-wider mb-1">Base Revenue (M)</label>
@@ -193,19 +197,24 @@
     </div>
 
     <script>
+        // Add the default DCF test data
         const testData = [
             [0.10, 0.25, 0.20, 2.0, 0.09, '', '', '', ''], // Year 1
             [0.08, 0.25, 0.20, 2.0, 0.09, '', '', '', ''], // Year 2
             [0.06, 0.25, 0.20, 2.0, 0.09, '', '', '', ''], // Year 3
             [0.05, 0.25, 0.20, 2.0, 0.09, '', '', '', ''], // Year 4
             [0.04, 0.25, 0.20, 2.0, 0.09, '', '', '', ''], // Year 5
-            [0.02, 0.25, 0.20, 0.20, 0.08, '', '', '', ''] // Year 6 (Terminal)
+            [0.02, 0.25, 0.20, 0.20, 0.08, '', '', '', ''], // Year 6
+            [0.02, 0.25, 0.20, 0.20, 0.08, '', '', '', ''], // Year 7
+            [0.02, 0.25, 0.20, 0.20, 0.08, '', '', '', ''], // Year 8
+            [0.02, 0.25, 0.20, 0.20, 0.08, '', '', '', ''], // Year 9
+            [0.02, 0.25, 0.20, 0.20, 0.08, '', '', '', ''], // Year 10
+            [0.02, 0.25, 0.20, 0.20, 0.08, '', '', '', ''] // Year 11 (Terminal)
         ];
         
         let html = '';
         for(let i=0; i<=10; i++) {
-            let v = i < 6 ? testData[i] : ['', '', '', '', '', '', '', '', ''];
-            
+            let v = testData[i];
             html += `
             <tr class="border-b border-gray-700/50 hover:bg-gray-700/20 transition-colors duration-200 text-center" id="row-${i}">
                 <td class="px-2 py-2 font-mono text-xs row-label transition-colors duration-200">Year ${i+1}</td>
@@ -222,50 +231,20 @@
         }
         document.getElementById('dcf-rows').innerHTML = html;
 
-        // 1. The Live Formatting Function
-        function formatInputWithCommas(arg) {
-            // 1. Smart targeting: Is this an Event object (arg.target) or a direct HTML element (arg)?
-            let input = arg.target ? arg.target : arg;
-            
-            // 2. Only track the cursor if the user is actively clicked inside this specific input
-            let isFocused = (document.activeElement === input);
-            let cursorPosition = isFocused ? input.selectionStart : 0;
-            let originalLength = input.value.length;
-
-            // 3. Strip out everything except numbers and decimals
-            let value = String(input.value).replace(/[^\d.]/g, '');
-
-            // 4. Format with commas
-            if (value !== '') {
-                let parts = value.split('.');
-                parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-                input.value = parts.slice(0, 2).join('.');
-            } else {
-                input.value = '';
-            }
-
-            // 5. Only adjust the cursor if the user is actively typing
-            if (isFocused) {
-                let newLength = input.value.length;
-                cursorPosition += (newLength - originalLength);
-                input.setSelectionRange(cursorPosition, cursorPosition);
-            }
-        }
-
-        // 2. Attach the listener to all formatted inputs
         document.querySelectorAll('.formatted-input').forEach(input => {
             input.addEventListener('input', formatInputWithCommas);
             
-            // Also trigger the spreadsheet math when these change!
             if(input.id === "input-baseRevenue") {
                 input.addEventListener('input', populateDCFTable); 
             }
+
             input.addEventListener('input', calculateDCFValues); 
         });
 
         document.getElementById('dcf-rows').addEventListener('input', () => {
-            validateDCFTableData();
-            populateDCFTable();
+            if(validateDCFTableData()) {
+                populateDCFTable();
+            }
         });
 
         setTimeout(() => {
@@ -273,8 +252,9 @@
                 formatInputWithCommas(input);
             });
 
-            validateDCFTableData();
-            populateDCFTable();
+            if(validateDCFTableData()) {
+                populateDCFTable();
+            }
         }, 50); 
     </script>
 

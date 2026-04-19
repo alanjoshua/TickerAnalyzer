@@ -26,6 +26,7 @@ func CalculateBeta(tickerData []float64, marketData []float64, tickerReturnsMean
 	return covarianceSum / marketVarianceSum, nil
 }
 
+// Beta is calculate as the covariance between the ticker's returns and the market returns
 func CalculateBetaFromTicker(ticker string, market string, timeFrame string) (float64, error) {
 	ticker = strings.ToUpper(strings.TrimSpace(ticker))
 	market = strings.ToUpper(strings.TrimSpace(market))
@@ -33,7 +34,7 @@ func CalculateBetaFromTicker(ticker string, market string, timeFrame string) (fl
 	end := time.Now().UTC()
 	var start time.Time
 
-	// Hard coded this just because I know the Yandex/nbis fiasco, would need to implement a system to handle this in the future
+	//TODO: Hard coded this just because I know the Yandex/nbis fiasco, would need to implement a system to handle this in the future
 	if ticker != "NBIS" {
 		start = end.AddDate(-5, 0, 0)
 	} else {

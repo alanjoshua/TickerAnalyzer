@@ -14,7 +14,7 @@
             <p class="text-lg font-mono text-white">{{printf "%.2f" .AnnVol}}%</p>
         </div>
         <div>
-            <p class="text-xs text-gray-400 uppercase tracking-wider">Expected Drift</p>
+            <p class="text-xs text-gray-400 uppercase tracking-wider">Expected Annual Drift</p>
             <p class="text-lg font-mono text-white">{{printf "%.2f" .AnnDrift}}%</p>
         </div>
         <div>
@@ -22,11 +22,11 @@
             <p class="text-lg font-mono text-white">{{printf "%.2f" .DailyDrag}}%</p>
         </div>
         <div>
-            <p class="text-xs text-gray-400 uppercase tracking-wider">Median Path (50th %%tile)</p>
+            <p class="text-xs text-gray-400 uppercase tracking-wider">Median Price (In one year)</p>
             <p class="text-lg font-mono text-white">{{printf "%.2f" .MedianPrice}}</p>
         </div>
         <div>
-            <p class="text-xs text-gray-400 uppercase tracking-wider">Expected Price (Mean)</p>
+            <p class="text-xs text-gray-400 uppercase tracking-wider">Mean Price (In one year)</p>
             <p class="text-lg font-mono text-white">{{printf "%.2f" .ExpectedPrice}}</p>
         </div>
         <div>
@@ -50,6 +50,8 @@
 
 <script>
 {
+    // Render Montecarlo paths as chart
+
     if(window.myChart) { window.myChart.destroy(); }
     
     const ctx = document.getElementById('mcChart').getContext('2d');

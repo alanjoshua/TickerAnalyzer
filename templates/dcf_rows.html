@@ -20,10 +20,13 @@
     document.getElementById('input-totalCash').value = "{{printf "%.2f" .TotalCash}}";
     document.getElementById('input-totalDebt').value = "{{printf "%.2f" .TotalDebt}}";
     document.getElementById('input-sharesOutstanding').value = "{{printf "%.2f" .SharesOutstanding}}";
+    document.getElementById('DCFDataSource').innerText = "{{printf "Data Source: %s" .DataSource}}";
     
     document.querySelectorAll('.formatted-input').forEach(input => {
         formatInputWithCommas(input);
     });
-    validateDCFTableData();
-    populateDCFTable();
+    
+    if(validateDCFTableData()) {
+        populateDCFTable();
+    }
 </script>

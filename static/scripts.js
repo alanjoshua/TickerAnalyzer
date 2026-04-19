@@ -1,4 +1,33 @@
+// Function that formats the various input values with commas
+function formatInputWithCommas(arg) {
+    
+    // Since this func could be called as either a user input event, or directly
+    let input = arg.target ? arg.target : arg;
+    
+    // Only track the cursor if the user is actively clicked inside this specific input
+    let isFocused = (document.activeElement === input);
+    let cursorPosition = isFocused ? input.selectionStart : 0;
+    let originalLength = input.value.length;
 
+    // Only keep numbers and period
+    let value = String(input.value).replace(/[^\d.]/g, '');
+
+    // Add commas
+    if (value !== '') {
+        let parts = value.split('.');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        input.value = parts.slice(0, 2).join('.');
+    } else {
+        input.value = '';
+    }
+
+    // Adjust the cursor position
+    if (isFocused) {
+        let newLength = input.value.length;
+        cursorPosition += (newLength - originalLength);
+        input.setSelectionRange(cursorPosition, cursorPosition);
+    }
+}
 
 function getTerminalRowInd() {
     let terminalRow = -1;
@@ -36,7 +65,6 @@ function populateDCFTable() {
     const tbody = document.getElementById('dcf-rows');
     const rows = tbody.querySelectorAll('tr');
 
-    // 1. Grab Year 0 Base Revenue from the global input at the top of the form
     let prevRev = getCleanNumber("input-baseRevenue");
     let shouldBreak = false;
     futureCashFlows = [];
@@ -45,7 +73,6 @@ function populateDCFTable() {
     for(let index = 0; index < rows.length; index++) {
         let row = rows[index];
 
-        // 2. Extract the user's assumptions
         const g = parseFloat(row.querySelector('input[name="revGrowth"]').value) || 0;
         const margin = parseFloat(row.querySelector('input[name="opMargin"]').value) || 0;
         const tax = parseFloat(row.querySelector('input[name="taxRate"]').value) || 0;
@@ -53,14 +80,13 @@ function populateDCFTable() {
         const wacc = parseFloat(row.querySelector('input[name="wacc"]').value) || 0;
         costOfCapitals.push(wacc);
 
-        // 3. The Core Math
         const currentRev = prevRev * (1 + g);
         const ebit = currentRev * margin;
         const ebitAfterTax = ebit * (1 - tax);
 
         let reinvestDollars = 0;
         
-        // Handle Terminal Year vs Normal Year logic
+        // Handle Terminal Year vs Normal Year
         // If the row has the terminal green border, it means reinvestInput is a % Rate, not a Sales/Cap ratio
         if (row.classList.contains('border-green-500') || index === 10) {
             reinvestDollars = ebitAfterTax * reinvestInput;
@@ -75,7 +101,7 @@ function populateDCFTable() {
         const fcff = ebitAfterTax - reinvestDollars;
         futureCashFlows.push(fcff);
 
-        // 4. Update the UI with nicely formatted numbers
+        // Format values with commas
         const revField = row.querySelector('input[name="revenue"]');
         const ebitField = row.querySelector('input[name="ebit"]');
         const reinvestField = row.querySelector('input[name="reinvest"]');
@@ -84,11 +110,10 @@ function populateDCFTable() {
         const formatOpts = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
 
         if(revField) revField.value = currentRev.toLocaleString('en-US', formatOpts);
-        if(ebitField) ebitField.value = ebitAfterTax.toLocaleString('en-US', formatOpts); // Often better to show After-Tax EBIT
+        if(ebitField) ebitField.value = ebitAfterTax.toLocaleString('en-US', formatOpts);
         if(reinvestField) reinvestField.value = reinvestDollars.toLocaleString('en-US', formatOpts);
         if(fcffField) fcffField.value = fcff.toLocaleString('en-US', formatOpts);
 
-        // 5. Set the current revenue as the "prevRev" for the next row's loop
         prevRev = currentRev;
 
         if (shouldBreak) break;
@@ -116,7 +141,7 @@ function calculateDCFValues() {
     const PVTerminalValue = terminalValue / discountRateThusFar;
     const valueOfOperatingAssets = PVCashFlows + PVTerminalValue;
 
-    // Get input values!
+    // Get input values
     const totalCash = getCleanNumber('input-totalCash');
     const totalDebt = getCleanNumber('input-totalDebt');
     const ipoProceeds = getCleanNumber('input-ipoProceeds');
@@ -130,7 +155,7 @@ function calculateDCFValues() {
 
     const formatOpts = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
 
-    // Sets UI values
+    // Output values to UI
     document.getElementById("res-tv").textContent = "$" + terminalValue.toLocaleString('en-US', formatOpts);
     document.getElementById("res-pv-tv").textContent = "$" + PVTerminalValue.toLocaleString('en-US', formatOpts);
     document.getElementById("res-pv-cf").textContent = "$" + PVCashFlows.toLocaleString('en-US', formatOpts);
@@ -193,13 +218,14 @@ function validateDCFTableData() {
         }
     });
 
-    // 3. Toggle the UI Error State
     const errorMsg = document.getElementById('dcf-error');
 
     if (!isMathValid) {
         errorMsg.textContent = "CRITICAL ERROR: Terminal Growth Rate must be less than Terminal WACC.";
         errorMsg.classList.remove('hidden');
+        return false;
     } else {
         errorMsg.classList.add('hidden');
+        return true;
     }
 }

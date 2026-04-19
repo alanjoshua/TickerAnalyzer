@@ -47,6 +47,7 @@ type DCFTemplateData struct {
 	TotalCash         float64
 	TotalDebt         float64
 	SharesOutstanding float64
+	DataSource        string
 	Rows              []RowData
 }
 
@@ -67,6 +68,7 @@ func main() {
 	// Perform DCF (running risk analysis also automatically runs dcf)
 	http.HandleFunc("/api/dcf", dcfHandler)
 
+	// To serve the script.js file
 	fs := http.FileServer(http.Dir("static"))
 	http.Handle("/static/", http.StripPrefix("/static/", fs))
 
@@ -90,21 +92,24 @@ func riskAnalysisHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Montecarlo simulation params
 	params := quant.SimulationParams{
 		CurrentPrice: tickerStats.CurrentPrice,
-		DailyDrift:   tickerStats.DailyDrift, // Annual return divided by trading days
-		DailyVol:     tickerStats.DailyVol,   // Annual vol scaled to daily
-		Days:         252,                    // Simulate 1 year into the future
-		Paths:        100000,                 // 100,000 monte carlo paths
+		DailyDrift:   tickerStats.DailyDrift,
+		DailyVol:     tickerStats.DailyVol,
+		Days:         252,
+		Paths:        100000,
 	}
 
 	result := quant.RunMonteCarlo(params)
 	chartDataJSON, _ := json.Marshal(result.SamplePaths)
 
-	annVol := tickerStats.DailyVol * math.Sqrt(252) * 100
+	// We multiplty with sqrt(252) since 252 is the number of trading days in a year, and volatility is the sqrt of variance
+	annVol := tickerStats.DailyVol * math.Sqrt(252) * 100 // As percentage
 	annDrift := tickerStats.DailyDrift * 252 * 100
-	dailyDrag := (0.5 * math.Pow(tickerStats.DailyVol, 2)) * 100 // Volatility Drag percentage
+	dailyDrag := (0.5 * math.Pow(tickerStats.DailyVol, 2))
 
+	// Beta is calculate by comparing the ticker's returns to the market returns
 	beta, err := quant.CalculateBetaFromTicker(ticker, "SPY", "1Week")
 	if err != nil {
 		fmt.Println(err)
@@ -123,6 +128,9 @@ func riskAnalysisHandler(w http.ResponseWriter, r *http.Request) {
 		ChartData:     template.JS(string(chartDataJSON)),
 	}
 
+	// Since DCF is triggered automatically via the htmx triggers that we set in the header, we also need to pass in the required data via the header
+	// This is needed because even though the DCF handler should be able to pull the data from the html, htmx triggers the next handler function before it finishes updating the HTML,
+	// and thus it ends up using the wrong values if we don't also send the values
 	triggerPayload := fmt.Sprintf(`{"run-dcf": {"beta": %.4f, "currentPrice": %.2f}}`, beta, tickerStats.CurrentPrice)
 	w.Header().Set("HX-Trigger", triggerPayload)
 
@@ -141,6 +149,7 @@ func riskAnalysisHandler(w http.ResponseWriter, r *http.Request) {
 func dcfHandler(w http.ResponseWriter, r *http.Request) {
 	ticker := strings.ToUpper(r.URL.Query().Get("ticker"))
 	if ticker == "" {
+		fmt.Fprintf(w, `<tr id="dcf-rows"><td colspan="6" class="text-red-400 p-4">Error reading ticker</td></tr>`)
 		return
 	}
 
@@ -155,39 +164,47 @@ func dcfHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch Live Data
-	funds, err := data.GetCompanyFundamentals(ticker)
+	// FMP is the primary data source, but currently I am using the free tier which only provides access to the top X number of companies such as AAPL, NVDA, GOOGL
+	dataSource := "FMP"
+	funds, err := data.GetCompanyFundamentals_FMP(ticker)
+
+	// Failed to get data from FMP, so fallback to yahoo finance through the python microservice
+	if err != nil {
+		log.Printf("Couldn't load ticker fundamentals data from FMP for %s\n", ticker)
+		funds, err = data.GetCompanyFundamentals_YFinance(ticker)
+		dataSource = "Yahoo Finance"
+	}
+
+	if err != nil {
+		fmt.Fprintf(w, `<tr id="dcf-rows"><td colspan="6" class="text-red-400 p-4">Couldn't get Ticker Fundamentals data from both FMP and Yahoo finance. <br> Check whether the secondary data-source python microservice is running%v</td></tr>`, err)
+		return
+	}
+
+	// Assume the risk free interest rate is equal to the 10 year treasury rate
+	// We are currently using the US rate since I would be using this tool mainly to analyze stocks that are heavily tied to the US stock market
 	riskFreeRate, err := data.Get10YearRiskFreeRate()
 	if err != nil {
 		riskFreeRate = 0.04
 	}
 	terminalWacc := riskFreeRate + EQUITYRISKPREMIUM
-
-	if err != nil {
-		fmt.Fprintf(w, `<tr id="dcf-rows"><td colspan="6" class="text-red-400 p-4">Error fetching %s: %v</td></tr>`, ticker, err)
-		return
-	}
-
-	fmt.Println("Fundamentals for ", ticker, ": ", funds)
-	fmt.Println("Risk free rate: ", riskFreeRate)
-
 	marketCap := currentPrice * funds.SharesOutstanding
+	terminalOperatingMargin := math.Max(funds.AvgOperatingMargin, 0.2) // TODO: Calculate the baseline terminal op margin from industry average data rather than hardcoded
 	curWacc := quant.CalculateWacc(marketCap, funds.TotalDebt, riskFreeRate, beta, EQUITYRISKPREMIUM, funds.InterestExpense, funds.TaxRate)
 	curRevGrowth := funds.HistRevCAGR
-	// Couldn't calculate rev growth due to insufficient historic data
+
+	// Couldn't calculate rev growth due to insufficient historic data, so we assume it is the same as the current 10 year risk free rate
 	if curRevGrowth == -1 {
 		curRevGrowth = riskFreeRate
 	}
 
-	// Generate the 10-Year data
+	// Generate the 10-Year DCF data
 	revGrowthRates := quant.Interpolate(curRevGrowth, riskFreeRate, 11)
-	WACCs := quant.Interpolate(curWacc, terminalWacc, len(revGrowthRates)) // TODO: Calculate current wacc
-	opMargins := quant.Interpolate(funds.AvgOperatingMargin, funds.AvgOperatingMargin, len(revGrowthRates))
+	WACCs := quant.Interpolate(curWacc, terminalWacc, len(revGrowthRates))
+	opMargins := quant.Interpolate(funds.AvgOperatingMargin, terminalOperatingMargin, len(revGrowthRates))
 	taxRates := quant.Interpolate(funds.AvgTaxRate, funds.AvgTaxRate, len(revGrowthRates))
 	salesToCapitalRatio := quant.Interpolate(funds.SalesToCapital, funds.SalesToCapital, len(revGrowthRates))
 
 	// terminal Reinvestment Rate = Terminal Growth​ / Terminal ROIC
-	// where ROIC can be assumed to equal to terminal wacc
 	salesToCapitalRatio[len(revGrowthRates)-1] = revGrowthRates[len(revGrowthRates)-1] / WACCs[len(revGrowthRates)-1]
 
 	data := DCFTemplateData{
@@ -195,6 +212,7 @@ func dcfHandler(w http.ResponseWriter, r *http.Request) {
 		TotalCash:         funds.TotalCash,
 		TotalDebt:         funds.TotalDebt,
 		SharesOutstanding: funds.SharesOutstanding,
+		DataSource:        dataSource,
 		Rows:              make([]RowData, 0),
 	}
 
