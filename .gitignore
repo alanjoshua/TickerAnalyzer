@@ -1,3 +1,6 @@
 .env
 *.exe
 *.log
+.venv/
+launch.json
+*.pyc

@@ -1,7 +1,7 @@
 <div class="p-4 mt-4 bg-gray-800 border border-gray-600 rounded-lg shadow-inner text-white animate-fade-in">
     <div class="flex justify-between items-center mb-4">
         <h3 class="text-xl font-bold text-blue-400 uppercase">{{.Ticker}} Risk Analysis</h3>
-        <span class="bg-blue-900 text-blue-300 text-xs font-medium px-2.5 py-0.5 rounded border border-blue-400">Live Data</span>
+        <span class="bg-blue-900 text-blue-300 text-xs font-medium px-2.5 py-0.5 rounded border border-blue-400">Data Source: Alpaca Markets</span>
     </div>
     
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 pb-4 border-b border-gray-700">
@@ -29,9 +29,9 @@
             <p class="text-xs text-gray-400 uppercase tracking-wider">Mean Price (In one year)</p>
             <p class="text-lg font-mono text-white">{{printf "%.2f" .ExpectedPrice}}</p>
         </div>
-        <div>
-            <p class="text-xs text-gray-400 uppercase tracking-wider">99%% Value at Risk (Mean)</p>
-            <p class="text-lg font-mono text-white">-{{printf "%.2f" .VaR}}</p>
+        <div title="99% Value at Risk is how much the stock price could change in a year in the 99th percentile worst case scenario">
+            <p class="text-xs text-gray-400 uppercase tracking-wider">99% Value at Risk</p>
+            <p class="text-lg font-mono text-white" id="VAR">14</p>
         </div>
         <div>
             <p class="text-xs text-gray-400 uppercase tracking-wider">Beta</p>
@@ -44,12 +44,27 @@
     </div>
 
     <div class="flex justify-between items-end">
-        <p class="text-sm text-gray-400">Simulated 100,000 paths (252 Days).</p>
+        <p class="text-sm text-gray-400">Monte Carlo Simulation: 100,000 paths simulated for 252 Days. </p>
     </div>
 </div>
 
 <script>
 {
+
+    let varValue = {{.VaR}}; 
+    let varElement = document.getElementById("VAR");
+
+    if (varValue > 0) {
+        // Standard VaR: We are expected to lose money
+        varElement.innerHTML = "-$" + varValue.toFixed(2);
+        varElement.className = "text-red-400 font-bold"; 
+    } else { 
+        // Negative VaR: Even in the worst case, we make money!
+        let positiveVaR = varValue * -1.0;
+        varElement.innerHTML = "+$" + positiveVaR.toFixed(2);
+        varElement.className = "text-green-400 font-bold";
+    }
+
     // Render Montecarlo paths as chart
 
     if(window.myChart) { window.myChart.destroy(); }

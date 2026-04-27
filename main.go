@@ -19,6 +19,7 @@ import (
 
 var Formatter = message.NewPrinter(language.English)
 var EQUITYRISKPREMIUM = 0.045
+var RISKFREERATE = 0.04
 
 type RiskAnalysisData struct {
 	Ticker        string
@@ -72,6 +73,14 @@ func main() {
 	fs := http.FileServer(http.Dir("static"))
 	http.Handle("/static/", http.StripPrefix("/static/", fs))
 
+	// Get the current 10 year risk free rate and keep it cached, since this shouldn't change much
+	riskFreeRate, err := data.Get10YearRiskFreeRate()
+	if err != nil {
+		log.Printf("Could not retrieve the current risk free rate due to error: %v, assuming a default value of %v", err, RISKFREERATE)
+	} else {
+		RISKFREERATE = riskFreeRate
+	}
+
 	// Boot server
 	fmt.Println(" Ticker analysis engine running on http://localhost:8080...")
 	log.Fatal(http.ListenAndServe(":8080", nil))
@@ -92,10 +101,19 @@ func riskAnalysisHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Beta is calculate by comparing the ticker's returns to the market returns
+	beta, err := quant.CalculateBetaFromTicker(ticker, "SPY", "1Week")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	// Use Cost of Equity as the annual expected return, aka annual mean drift
+	expectedAnnualReturn := RISKFREERATE + (beta * EQUITYRISKPREMIUM)
+
 	// Montecarlo simulation params
 	params := quant.SimulationParams{
 		CurrentPrice: tickerStats.CurrentPrice,
-		DailyDrift:   tickerStats.DailyDrift,
+		DailyDrift:   expectedAnnualReturn / 252.0,
 		DailyVol:     tickerStats.DailyVol,
 		Days:         252,
 		Paths:        100000,
@@ -106,14 +124,8 @@ func riskAnalysisHandler(w http.ResponseWriter, r *http.Request) {
 
 	// We multiplty with sqrt(252) since 252 is the number of trading days in a year, and volatility is the sqrt of variance
 	annVol := tickerStats.DailyVol * math.Sqrt(252) * 100 // As percentage
-	annDrift := tickerStats.DailyDrift * 252 * 100
+	annDrift := expectedAnnualReturn * 100
 	dailyDrag := (0.5 * math.Pow(tickerStats.DailyVol, 2))
-
-	// Beta is calculate by comparing the ticker's returns to the market returns
-	beta, err := quant.CalculateBetaFromTicker(ticker, "SPY", "1Week")
-	if err != nil {
-		fmt.Println(err)
-	}
 
 	data := RiskAnalysisData{
 		Ticker:        ticker,
@@ -182,23 +194,19 @@ func dcfHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Assume the risk free interest rate is equal to the 10 year treasury rate
 	// We are currently using the US rate since I would be using this tool mainly to analyze stocks that are heavily tied to the US stock market
-	riskFreeRate, err := data.Get10YearRiskFreeRate()
-	if err != nil {
-		riskFreeRate = 0.04
-	}
-	terminalWacc := riskFreeRate + EQUITYRISKPREMIUM
+	terminalWacc := RISKFREERATE + EQUITYRISKPREMIUM
 	marketCap := currentPrice * funds.SharesOutstanding
 	terminalOperatingMargin := math.Max(funds.AvgOperatingMargin, 0.2) // TODO: Calculate the baseline terminal op margin from industry average data rather than hardcoded
-	curWacc := quant.CalculateWacc(marketCap, funds.TotalDebt, riskFreeRate, beta, EQUITYRISKPREMIUM, funds.InterestExpense, funds.TaxRate)
+	curWacc := quant.CalculateWacc(marketCap, funds.TotalDebt, RISKFREERATE, beta, EQUITYRISKPREMIUM, funds.InterestExpense, funds.TaxRate)
 	curRevGrowth := funds.HistRevCAGR
 
 	// Couldn't calculate rev growth due to insufficient historic data, so we assume it is the same as the current 10 year risk free rate
 	if curRevGrowth == -1 {
-		curRevGrowth = riskFreeRate
+		curRevGrowth = RISKFREERATE
 	}
 
 	// Generate the 10-Year DCF data
-	revGrowthRates := quant.Interpolate(curRevGrowth, riskFreeRate, 11)
+	revGrowthRates := quant.Interpolate(curRevGrowth, RISKFREERATE, 11)
 	WACCs := quant.Interpolate(curWacc, terminalWacc, len(revGrowthRates))
 	opMargins := quant.Interpolate(funds.AvgOperatingMargin, terminalOperatingMargin, len(revGrowthRates))
 	taxRates := quant.Interpolate(funds.AvgTaxRate, funds.AvgTaxRate, len(revGrowthRates))
